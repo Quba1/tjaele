@@ -22,6 +22,14 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
+use crate::intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeed};
+
+#[derive(Debug)]
+pub struct FanState {
+    pub speed: u32,
+    pub control_policy: u32,
+}
+
 #[derive(Debug)]
 pub struct App {
     nvml: Nvml,
@@ -127,7 +135,8 @@ struct NvmlState {
     slowdown_temperature: u32,
     gpumax_temperature: u32,
     temperature: u32,
-    fans_speed: Vec<u32>,
+    fans_state: Vec<FanState>,
+    minmax_fan_speed: MinMaxFanSpeed,
 }
 
 impl NvmlState {
@@ -172,9 +181,18 @@ impl NvmlState {
         let gpumax_temperature = device.temperature_threshold(TemperatureThreshold::GpuMax)?;
 
         let temperature = device.temperature(TemperatureSensor::Gpu)?;
-        let fans_speed = (0..num_fans)
-            .map(|fan_idx| device.fan_speed(fan_idx).context("Failed to read fan speed"))
+        let fans_state = (0..num_fans)
+            .map(|fan_idx| -> Result<FanState> {
+                Ok(FanState {
+                    speed: device.fan_speed(fan_idx).context("Failed to read fan speed")?,
+                    control_policy: device
+                        .fan_control_policy(fan_idx)
+                        .context("Failed to read fan policy")?,
+                })
+            })
             .collect::<Result<Vec<_>>>()?;
+
+        let minmax_fan_speed = device.min_max_fan_speed()?;
 
         Ok(Self {
             probe_time,
@@ -201,7 +219,8 @@ impl NvmlState {
             slowdown_temperature,
             gpumax_temperature,
             temperature,
-            fans_speed,
+            fans_state,
+            minmax_fan_speed,
         })
     }
 
@@ -272,6 +291,13 @@ impl NvmlState {
         lines.push(Line::from(vec!["".into()]));
 
         lines.push(Line::from(vec![
+            "Theoretical applicable fan speeds: ".to_string().yellow(),
+            format!("{}% (min), {}% (max)", self.minmax_fan_speed.min, self.minmax_fan_speed.max,)
+                .into(),
+        ]));
+        lines.push(Line::from(vec!["".into()]));
+
+        lines.push(Line::from(vec![
             "Memory: ".to_string().yellow(),
             format!(
                 "{} (used), {} (total)",
@@ -301,10 +327,12 @@ impl NvmlState {
         ]));
 
         let mut fan_line = vec!["Fans speed:".to_string().yellow()];
-        self.fans_speed
-            .iter()
-            .enumerate()
-            .for_each(|(idx, &spd)| fan_line.push(format!(" {}=>{}%", idx, spd).into()));
+        self.fans_state.iter().enumerate().for_each(|(idx, state)| {
+            fan_line.push(
+                format!(" <fan_{} speed: {}% policy: {}>", idx, state.speed, state.control_policy,)
+                    .into(),
+            )
+        });
         lines.push(Line::from(fan_line));
         lines.push(Line::from(vec!["".into()]));
 

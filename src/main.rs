@@ -1,5 +1,10 @@
+mod control;
+mod intermediate_bindings;
 mod monitor;
 
+use std::ffi::OsStr;
+
+use control::control_main;
 use monitor::monitor_main;
 
 use anyhow::{ensure, Result};
@@ -29,7 +34,8 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let nvml = Nvml::init()?;
+    // recommended path for loading nvml
+    let nvml = Nvml::builder().lib_path(OsStr::new("libnvidia-ml.so.1")).init()?;
     ensure!(
         nvml.device_count()? == 1,
         "nvmlcontrol currently supports platforms with one GPU only"
@@ -38,7 +44,7 @@ fn main() -> Result<()> {
     if let Some(cmd) = cli.command {
         match cmd {
             Commands::Monitor { refresh_interval } => monitor_main(refresh_interval, nvml)?,
-            Commands::Control => control_main(),
+            Commands::Control => control_main(&nvml)?,
             Commands::Register => register_main(),
         }
     }
@@ -46,5 +52,4 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn control_main() {}
 fn register_main() {}
