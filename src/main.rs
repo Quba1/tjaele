@@ -2,7 +2,6 @@
 
 mod control;
 mod gpu_manager;
-mod intermediate_bindings;
 mod monitor;
 
 use std::path::PathBuf;
@@ -14,7 +13,6 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 pub use gpu_manager::{GpuManager, GpuState};
-pub use intermediate_bindings::AdditionalNvmlFunctionality;
 
 // Probability of IP collision is virtually zero
 const BIND_IP: &'static str = "127.45.62.73";
@@ -48,7 +46,7 @@ async fn main() -> Result<()> {
 
     if let Some(cmd) = cli.command {
         match cmd {
-            Commands::Monitor { refresh_interval } => todo!(),
+            Commands::Monitor { refresh_interval } => monitor_main(refresh_interval).await?,
             Commands::Control { config_path } => control_main(config_path).await?,
             Commands::Register => register_main(),
         }
