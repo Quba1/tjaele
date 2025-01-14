@@ -1,11 +1,13 @@
-use std::ffi::OsStr;
+use std::{ffi::OsStr, path::Path};
 
 mod device_probe;
+mod fan_control;
 mod intermediate_bindings;
 mod tui_text;
 
 use anyhow::{bail, ensure, Context, Result};
 use chrono::{DateTime, Local};
+use derive_more::derive::Display;
 use intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeeds};
 use nvml_wrapper::{
     cuda_driver_version_major, cuda_driver_version_minor,
@@ -16,7 +18,9 @@ use nvml_wrapper::{
     Device, Nvml,
 };
 use ouroboros::self_referencing;
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use tokio::sync::Mutex;
 
 pub struct GpuManager {
@@ -24,6 +28,7 @@ pub struct GpuManager {
     // Using Tokio mutex is somewhat justified as it's an IO function
     nvml_handle: Mutex<NvmlHandle>,
     persistent_params: PersistentGpuParams,
+    control_config: TjaeleControlConfig,
 }
 
 #[self_referencing]
@@ -35,7 +40,13 @@ struct NvmlHandle {
 }
 
 impl GpuManager {
-    pub fn init() -> Result<Self> {
+    pub fn init<P: AsRef<Path>>(config_path: P) -> Result<Self> {
+        let control_config =
+            TjaeleControlConfig::new_from_file(config_path)?.precompute_fan_curve()?;
+
+        dbg!(&control_config);
+        todo!();
+
         // recommended path for loading nvml
         let nvml = Nvml::builder().lib_path(OsStr::new("libnvidia-ml.so.1")).init()?;
         ensure!(
@@ -49,7 +60,7 @@ impl GpuManager {
 
         let persistent_params = PersistentGpuParams::init(&nvml_handle)?;
 
-        Ok(GpuManager { nvml_handle: Mutex::new(nvml_handle), persistent_params })
+        Ok(GpuManager { nvml_handle: Mutex::new(nvml_handle), persistent_params, control_config })
     }
 
     pub async fn read_state(&self) -> Result<GpuState> {
@@ -76,6 +87,34 @@ impl Drop for GpuManager {
                     .expect("Failed to set auto fan control policy upon nvmlcontrol shutdown");
             }
         });
+    }
+}
+
+#[serde_as]
+#[derive(Debug, Clone, Deserialize)]
+pub struct TjaeleControlConfig {
+    pub response_time: f64,
+    pub hysteresis: u16,
+    #[serde_as(as = "Vec<(_, _)>")]
+    pub fan_curve: FxHashMap<u8, u8>,
+}
+
+impl TjaeleControlConfig {
+    pub(self) fn new_from_file<Q: AsRef<Path>>(path: Q) -> Result<Self> {
+        let cfg = std::fs::read_to_string(path)?;
+        let cfg: Self = toml::from_str(&cfg)?;
+
+        ensure!(cfg.hysteresis > 0 && cfg.hysteresis <= 5, "Hysteresis must be between 1C and 5C");
+        ensure!(cfg.response_time >= 0.25, "Response time must be at least than 0.25 seconds");
+
+        cfg.fan_curve.iter().try_for_each(|(_, &fan_duty)| -> Result<()> {
+            ensure!(fan_duty <= 100, "Fan duty cannot be higher than 100%");
+            Ok(())
+        });
+
+        ensure!(cfg.fan_curve.len() >= 3, "Fan curve must have at least 3 points");
+
+        Ok(cfg)
     }
 }
 
@@ -148,5 +187,22 @@ pub struct CudaVersion {
 pub struct FanState {
     pub index: usize,
     pub speed: u32,
-    pub control_policy: u32,
+    pub control_policy: FanControlPolicy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
+pub enum FanControlPolicy {
+    Automatic,
+    Manual,
+    Unknown,
+}
+
+impl From<u32> for FanControlPolicy {
+    fn from(value: u32) -> Self {
+        match value {
+            0 => Self::Automatic,
+            1 => Self::Manual,
+            _ => Self::Unknown,
+        }
+    }
 }

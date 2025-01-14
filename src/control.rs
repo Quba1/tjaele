@@ -29,8 +29,9 @@ async fn gpu_state(req: HttpRequest) -> impl Responder {
 }
 
 pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> {
-    let gpu_manager = Arc::new(GpuManager::init()?);
     //this must run as sudo so maybe /etc/config
+    let config_path = config_path.unwrap(); // for now unwrap
+    let gpu_manager = Arc::new(GpuManager::init(config_path)?);
 
     HttpServer::new(move || App::new().app_data(gpu_manager.clone()).service(gpu_state))
         .bind((BIND_IP, 8080))?

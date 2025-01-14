@@ -21,6 +21,7 @@ use ratatui::{
     widgets::{Block, Paragraph, Widget},
     DefaultTerminal, Frame,
 };
+// no need for blocking client, because Reqwest runs Tokio anyway
 use reqwest::{Client, ClientBuilder};
 
 use crate::{GpuState, BIND_IP};
