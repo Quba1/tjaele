@@ -1,40 +1,42 @@
-use anyhow::Result;
-use nvml_wrapper::{Device, Nvml};
+use std::{ffi::OsStr, path::Path, sync::Arc};
 
-use crate::intermediate_bindings::AdditionalNvmlFunctionality;
+use anyhow::{ensure, Context, Result};
 
-pub fn control_main(nvml: &Nvml) -> Result<()> {
-    // must have histeresis
+use actix_web::{
+    error::ErrorInternalServerError, get, post, web, App, HttpRequest, HttpResponse, HttpServer,
+    Responder,
+};
+use nvml_wrapper::Nvml;
+use tokio::sync::Mutex;
 
-    let controller = FanController::init(nvml)?;
+use crate::{GpuManager, BIND_IP};
 
-    Ok(())
-}
+#[get("/gpustate")]
+async fn gpu_state(req: HttpRequest) -> impl Responder {
+    let gpu_manager = req.app_data::<Arc<GpuManager>>().expect("Failed to extract GpuManager");
+    let gpu_device_state = gpu_manager.read_state().await;
 
-// implementation is moved into struct to have a destructor called on program shutdown
-#[derive(Debug)]
-struct FanController<'nvml> {
-    device: Device<'nvml>,
-    num_fans: u32,
-}
-
-impl<'nvml> FanController<'nvml> {
-    pub fn init(nvml: &'nvml Nvml) -> Result<Self> {
-        let device = nvml.device_by_index(0)?;
-        let num_fans = device.num_fans()?;
-
-        Ok(Self { device, num_fans })
+    match gpu_device_state {
+        Ok(state) => HttpResponse::Ok().json(state),
+        Err(err) => {
+            let mut error_text = format!("Error chain:\n");
+            for (i, e) in err.chain().enumerate() {
+                error_text.push_str(&format!("[{i}]: {}\n", e.to_string()));
+            }
+            ErrorInternalServerError(error_text).error_response()
+        },
     }
 }
 
-impl<'nvml> Drop for FanController<'nvml> {
-    fn drop(&mut self) {
-        for fan_idx in 0..self.num_fans {
-            self.device
-                .set_default_fan_speed(fan_idx)
-                // We panic here on purpose, so that failure "wreaks havoc"
-                // Ignoring error here could be potentially dangerous for the GPU
-                .expect("Failed to set auto fan control policy upon nvmlcontrol shutdown")
-        }
-    }
+pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> {
+    let gpu_manager = Arc::new(GpuManager::init()?);
+    //this must run as sudo so maybe /etc/config
+
+    HttpServer::new(move || App::new().app_data(gpu_manager.clone()).service(gpu_state))
+        .bind((BIND_IP, 8080))?
+        .run()
+        .await
+        .context(
+            "Failed to create HTTP server - this is most likely because Tjaele is already running",
+        )
 }

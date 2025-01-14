@@ -5,22 +5,23 @@ use nvml_wrapper::{
     Device,
 };
 use nvml_wrapper_sys::bindings::nvmlFanControlPolicy_t;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
-pub struct MinMaxFanSpeed {
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct MinMaxFanSpeeds {
     pub min: u32,
     pub max: u32,
 }
 
 pub trait AdditionalNvmlFunctionality {
-    fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeed, NvmlError>;
+    fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeeds, NvmlError>;
     fn fan_control_policy(&self, fan_idx: u32) -> Result<u32, NvmlError>;
     fn set_fan_speed(&self, fan_idx: u32, fan_speed: u32) -> Result<(), NvmlError>;
     fn set_default_fan_speed(&self, fan_idx: u32) -> Result<(), NvmlError>;
 }
 
 impl<'nvml> AdditionalNvmlFunctionality for Device<'nvml> {
-    fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeed, NvmlError> {
+    fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeeds, NvmlError> {
         let sym = nvml_sym(self.nvml().nvml_lib().nvmlDeviceGetMinMaxFanSpeed.as_ref())?;
 
         let mut min_speed: c_uint = 0;
@@ -28,7 +29,7 @@ impl<'nvml> AdditionalNvmlFunctionality for Device<'nvml> {
 
         unsafe { nvml_try(sym(self.handle(), &mut min_speed, &mut max_speed))? }
 
-        Ok(MinMaxFanSpeed { min: min_speed.into(), max: max_speed.into() })
+        Ok(MinMaxFanSpeeds { min: min_speed.into(), max: max_speed.into() })
     }
 
     fn fan_control_policy(&self, fan_idx: u32) -> Result<u32, NvmlError> {

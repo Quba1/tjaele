@@ -1,0 +1,16 @@
+# !!!!! WARNING !!!!!
+# THIS CONFIG HAS BEEN TESTED ONLY ON ONE MACHINE
+# YOU ARE USING IT AT YOUR OWN RESPONSIBILITY
+
+response_time = 1.0 # seconds
+hysteresis = 2 # Celsius
+fan_curve = [
+    # [GPU_TEMP(C), FAN_DUTY(%)]
+    [20, 30],
+    [32, 50],
+    [50, 60],
+    [64, 78],
+    [70, 100],
+]
+
+

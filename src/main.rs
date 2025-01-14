@@ -1,15 +1,23 @@
+#![allow(unused)]
+
 mod control;
+mod gpu_manager;
 mod intermediate_bindings;
 mod monitor;
 
-use std::ffi::OsStr;
+use std::path::PathBuf;
 
 use control::control_main;
 use monitor::monitor_main;
 
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
-use nvml_wrapper::Nvml;
+
+pub use gpu_manager::{GpuManager, GpuState};
+pub use intermediate_bindings::AdditionalNvmlFunctionality;
+
+// Probability of IP collision is virtually zero
+const BIND_IP: &'static str = "127.45.62.73";
 
 #[derive(Parser)]
 #[command(version, about = "about", long_about = "long about", arg_required_else_help = true)]
@@ -26,25 +34,22 @@ enum Commands {
         refresh_interval: f64,
     },
     /// Run the GPU control loop
-    Control,
+    Control {
+        #[arg(short, long)]
+        config_path: Option<PathBuf>,
+    },
     /// Install the utility to start in the background at startup
     Register,
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
-
-    // recommended path for loading nvml
-    let nvml = Nvml::builder().lib_path(OsStr::new("libnvidia-ml.so.1")).init()?;
-    ensure!(
-        nvml.device_count()? == 1,
-        "nvmlcontrol currently supports platforms with one GPU only"
-    );
 
     if let Some(cmd) = cli.command {
         match cmd {
-            Commands::Monitor { refresh_interval } => monitor_main(refresh_interval, nvml)?,
-            Commands::Control => control_main(&nvml)?,
+            Commands::Monitor { refresh_interval } => todo!(),
+            Commands::Control { config_path } => control_main(config_path).await?,
             Commands::Register => register_main(),
         }
     }

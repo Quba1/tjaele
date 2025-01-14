@@ -22,7 +22,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
-use crate::intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeed};
+use crate::intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeeds};
 
 #[derive(Debug)]
 pub struct FanState {
@@ -136,7 +136,7 @@ struct NvmlState {
     gpumax_temperature: u32,
     temperature: u32,
     fans_state: Vec<FanState>,
-    minmax_fan_speed: MinMaxFanSpeed,
+    minmax_fan_speed: MinMaxFanSpeeds,
 }
 
 impl NvmlState {
