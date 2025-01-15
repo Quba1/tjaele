@@ -2,7 +2,7 @@
 
 use std::time::{Duration, Instant};
 
-use anyhow::{ensure, Result};
+use anyhow::{ensure, Context, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     buffer::Buffer,
@@ -21,7 +21,7 @@ use crate::{GpuState, BIND_IP};
 #[derive(Debug)]
 pub struct App {
     http_client: Client,
-    latest_data: MonitorData,
+    latest_data: Result<MonitorData>,
     should_exit: bool,
 }
 
@@ -50,7 +50,7 @@ pub async fn monitor_main(refresh_interval: f64) -> Result<()> {
 impl App {
     pub async fn init() -> Result<Self> {
         let http_client = ClientBuilder::new().http1_only().build()?;
-        let latest_data = MonitorData::probe(&http_client).await?;
+        let latest_data = MonitorData::probe(&http_client).await;
 
         Ok(App { should_exit: false, http_client, latest_data })
     }
@@ -74,7 +74,7 @@ impl App {
             }
 
             if last_tick.elapsed() >= tick_rate {
-                self.latest_data = MonitorData::probe(&self.http_client).await?;
+                self.latest_data = MonitorData::probe(&self.http_client).await;
                 last_tick = Instant::now();
             }
 
@@ -100,7 +100,7 @@ impl Widget for &App {
             .title_bottom(instructions.centered())
             .border_set(border::THICK);
 
-        Paragraph::new(self.latest_data.to_tui_text()).block(block).render(area, buf);
+        Paragraph::new(render_probe_result(&self.latest_data)).block(block).render(area, buf);
     }
 }
 
@@ -111,9 +111,11 @@ impl MonitorData {
         let gpu_device_state = http_client
             .get(format!("http://{BIND_IP}:8080/gpustate"))
             .send()
-            .await?
+            .await
+            .context("Failed to get tjaele data, is control unit running?")?
             .json::<GpuState>()
-            .await?;
+            .await
+            .context("Tjaele monitor data is malformed")?;
 
         let elapsed = now.elapsed();
 
@@ -131,5 +133,23 @@ impl MonitorData {
         lines.append(&mut self.gpu_state.render_tui_lines());
 
         Text::from(lines)
+    }
+}
+
+fn render_probe_result(result: &Result<MonitorData>) -> Text<'static> {
+    match result {
+        Ok(data) => return data.to_tui_text(),
+        Err(err) => {
+            let mut lines =
+                vec![Line::from(vec!["Tjaele Monitor failed to acquire GPU data with error chain: "
+                    .to_string()
+                    .yellow()])];
+
+            for (i, e) in err.chain().enumerate() {
+                lines.push(Line::from(vec![format!("[{i}]: {e}\n").into()]));
+            }
+
+            lines.into()
+        },
     }
 }
