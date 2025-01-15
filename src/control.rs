@@ -9,11 +9,12 @@ use actix_web::{
     HttpServer, Responder,
 };
 use anyhow::{Context, Result};
+use std::os::unix::net::UnixListener;
 use tokio::task;
 use tracing::{error, info, Level};
 use tracing_log::LogTracer;
 
-use crate::{GpuManager, BIND_IP};
+use crate::GpuManager;
 
 #[tracing::instrument]
 pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Result<()> {
@@ -25,7 +26,6 @@ pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Res
         .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
-
     LogTracer::init()?;
 
     let config_path = match config_path {
@@ -33,21 +33,21 @@ pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Res
         None => PathBuf::from("/usr/local/etc/tjaele/config.toml"),
     };
     let gpu_manager = Arc::new(GpuManager::init(config_path)?);
-
     info!("Successfully initialized connection with NVML");
 
     let gpu_manager1 = gpu_manager.clone();
+
+    // Using std bind because it fails on double-bind while actix doesn't
+    let listener = UnixListener::bind("/var/run/tjaele/tjaele.sock").context(
+        "Failed to bind to socket, this is most likely because another tjaele instance is running",
+    )?;
     let srv = HttpServer::new(move || App::new().app_data(gpu_manager1.clone()).service(gpu_state))
         .workers(4)
-        .bind((BIND_IP, 8080))?
+        .listen_uds(listener)?
         .run();
 
-    // technically this can allow for a brief moment to have two instances running
     task::spawn(fan_control(gpu_manager.clone(), srv.handle()));
-
-    srv.await.context(
-        "Failed to create HTTP server - this is most likely because Tjaele is already running",
-    )
+    srv.await.context("Failed to start HTTP server")
 }
 
 #[get("/gpustate")]

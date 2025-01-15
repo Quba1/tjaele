@@ -1,5 +1,8 @@
 [Unit]
 Description=Nvidia Fan Control for Wayland
+After=sockets.target
+After=graphical.target
+Wants=sockets.target
 
 [Service]
 Type=simple

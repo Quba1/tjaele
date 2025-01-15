@@ -13,7 +13,7 @@ use ratatui::{
 // no need for blocking client, because Reqwest runs Tokio anyway
 use reqwest::{Client, ClientBuilder};
 
-use crate::{GpuState, BIND_IP};
+use crate::GpuState;
 use tui_blocks::{
     render_cooling_chart, render_fans_table, DeviceBlock, DriverBlock, ErrorBlock, SpecsBlock,
     TemperatureBlock, TimeBlock,

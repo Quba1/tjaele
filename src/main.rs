@@ -20,9 +20,6 @@ use clap::{Parser, Subcommand};
 
 pub use gpu_manager::{GpuManager, GpuState};
 
-// Probability of IP collision is virtually zero
-const BIND_IP: &str = "127.45.62.73";
-
 #[derive(Parser)]
 #[command(version, about = "about", long_about = "long about", arg_required_else_help = true)]
 struct Cli {
