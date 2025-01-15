@@ -9,7 +9,7 @@ impl GpuState {
 
         lines.push(Line::from(vec![
             "System Time: ".to_string().yellow(),
-            format!("{}", self.runtime.probe_time.to_rfc2822()).into(),
+            self.runtime.probe_time.to_rfc2822().to_string().into(),
         ]));
         lines.push(Line::from(vec!["".into()]));
 
@@ -28,7 +28,7 @@ impl GpuState {
 
         lines.push(Line::from(vec![
             "Driver version: ".to_string().yellow(),
-            format!("{}", self.persistent.sys_info.driver_version).into(),
+            self.persistent.sys_info.driver_version.to_string().into(),
         ]));
         lines.push(Line::from(vec![
             "CUDA Driver version: ".to_string().yellow(),
@@ -50,7 +50,7 @@ impl GpuState {
         ]));
         lines.push(Line::from(vec![
             "NVML version: ".to_string().yellow(),
-            format!("{}", self.persistent.sys_info.nvml_version).into(),
+            self.persistent.sys_info.nvml_version.to_string().into(),
         ]));
         lines.push(Line::from(vec!["".into()]));
 

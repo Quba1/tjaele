@@ -63,10 +63,7 @@ impl App {
             if event::poll(timeout)? {
                 match event::read()? {
                     Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                        match key_event.code {
-                            KeyCode::Char('q') => self.should_exit = true,
-                            _ => {},
-                        }
+                        if let KeyCode::Char('q') = key_event.code { self.should_exit = true }
                     },
                     _ => {},
                 }

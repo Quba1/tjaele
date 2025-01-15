@@ -133,14 +133,14 @@ struct OccupiedError<'a, K: 'a, V: 'a> {
     pub value: V,
 }
 
-impl<'a, K: fmt::Debug, V: fmt::Debug> Error for OccupiedError<'a, K, V> {
+impl<K: fmt::Debug, V: fmt::Debug> Error for OccupiedError<'_, K, V> {
     #[allow(deprecated)]
     fn description(&self) -> &str {
         "key already exists"
     }
 }
 
-impl<'a, K: fmt::Debug, V: fmt::Debug> fmt::Display for OccupiedError<'a, K, V> {
+impl<K: fmt::Debug, V: fmt::Debug> fmt::Display for OccupiedError<'_, K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

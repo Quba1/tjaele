@@ -34,9 +34,9 @@ async fn gpu_state(req: HttpRequest) -> impl Responder {
     match gpu_device_state {
         Ok(state) => HttpResponse::Ok().json(state),
         Err(err) => {
-            let mut error_text = format!("Error chain:\n");
+            let mut error_text = "Error chain:\n".to_string();
             for (i, e) in err.chain().enumerate() {
-                error_text.push_str(&format!("[{i}]: {}\n", e.to_string()));
+                error_text.push_str(&format!("[{i}]: {}\n", e));
             }
             ErrorInternalServerError(error_text).error_response()
         },
