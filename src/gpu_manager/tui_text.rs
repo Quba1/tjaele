@@ -1,3 +1,6 @@
+#![allow(clippy::cast_precision_loss)]
+#![allow(clippy::too_many_lines)]
+
 use pretty_bytes::converter::convert;
 use ratatui::{style::Stylize, text::Line};
 
@@ -80,7 +83,7 @@ impl GpuState {
                 "{}x{} ({})",
                 self.runtime.current_pcie_link.gen,
                 self.runtime.current_pcie_link.width,
-                convert(self.runtime.current_pcie_link.speed as _).replace("B", "T") + "/s",
+                convert(self.runtime.current_pcie_link.speed as _).replace('B', "T") + "/s",
             )
             .into(),
         ]));
@@ -90,7 +93,7 @@ impl GpuState {
                 "{}x{} ({})",
                 self.persistent.max_pcie_link.gen,
                 self.persistent.max_pcie_link.width,
-                convert(self.persistent.max_pcie_link.speed as _).replace("B", "T") + "/s",
+                convert(self.persistent.max_pcie_link.speed as _).replace('B', "T") + "/s",
             )
             .into(),
         ]));
@@ -133,7 +136,7 @@ impl GpuState {
                 "    fan_{} = {{speed: {}% policy: {}}}",
                 state.index, state.speed, state.control_policy,
             )
-            .into()]))
+            .into()]));
         });
         lines.push(Line::from(vec!["".into()]));
 

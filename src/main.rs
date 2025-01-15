@@ -1,3 +1,11 @@
+#![warn(clippy::pedantic)]
+#![warn(clippy::cargo)]
+#![warn(clippy::perf)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::multiple_crate_versions)]
+
 mod control;
 mod gpu_manager;
 mod monitor;

@@ -36,7 +36,7 @@ async fn gpu_state(req: HttpRequest) -> impl Responder {
         Err(err) => {
             let mut error_text = "Error chain:\n".to_string();
             for (i, e) in err.chain().enumerate() {
-                error_text.push_str(&format!("[{i}]: {}\n", e));
+                error_text.push_str(&format!("[{i}]: {e}\n"));
             }
             ErrorInternalServerError(error_text).error_response()
         },
@@ -50,7 +50,7 @@ async fn fan_control(gpu_manager: Arc<GpuManager>, server_handle: ServerHandle) 
             Ok(t) => gpu_temp = t,
             Err(e) => {
                 println!("Fan control failed with error: {e}. Shutting down.");
-                server_handle.stop(true).await
+                server_handle.stop(true).await;
             },
         }
         gpu_manager.sleep().await;

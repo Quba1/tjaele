@@ -1,3 +1,5 @@
+#![allow(clippy::cast_precision_loss)]
+
 use std::time::{Duration, Instant};
 
 use anyhow::{ensure, Result};
@@ -63,7 +65,9 @@ impl App {
             if event::poll(timeout)? {
                 match event::read()? {
                     Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                        if let KeyCode::Char('q') = key_event.code { self.should_exit = true }
+                        if let KeyCode::Char('q') = key_event.code {
+                            self.should_exit = true;
+                        }
                     },
                     _ => {},
                 }
@@ -121,7 +125,7 @@ impl MonitorData {
 
         let mut lines = vec![Line::from(vec![
             "Monitor Latency: ".to_string().yellow(),
-            format!("{} ms", latency).into(),
+            format!("{latency} ms").into(),
         ])];
 
         lines.append(&mut self.gpu_state.render_tui_lines());

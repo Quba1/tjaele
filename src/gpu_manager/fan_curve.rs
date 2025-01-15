@@ -1,3 +1,5 @@
+#![allow(clippy::cast_sign_loss)]
+
 use std::{
     collections::hash_map::{
         Entry::{Occupied, Vacant},
@@ -23,8 +25,9 @@ impl GpuManager {
         let new_temp =
             device.temperature(TemperatureSensor::Gpu).context("Failed to read GPU temperature")?;
 
-        let hysteresis_range = previous_temp.saturating_sub(self.control_config.hysteresis as u32)
-            ..=previous_temp.saturating_add(self.control_config.hysteresis as u32);
+        let hysteresis_range = previous_temp
+            .saturating_sub(u32::from(self.control_config.hysteresis))
+            ..=previous_temp.saturating_add(u32::from(self.control_config.hysteresis));
 
         if hysteresis_range.contains(&new_temp) {
             return Ok(previous_temp);
@@ -41,7 +44,7 @@ impl GpuManager {
 
         for fan_idx in 0..self.persistent_params.num_fans {
             device
-                .set_fan_speed(fan_idx as u32, target_duty as u32)
+                .set_fan_speed(fan_idx as u32, u32::from(target_duty))
                 .context("Failed to set fan speed")?;
         }
 
@@ -80,12 +83,12 @@ impl TjaeleControlConfig {
 
             ensure!(lo_point.duty <= hi_point.duty, "Fan duty must not decrease with temperature");
 
-            let m = (hi_point.duty as f64 - lo_point.duty as f64)
-                / (hi_point.temp as f64 - lo_point.temp as f64);
-            let b = lo_point.duty as f64 - (m * lo_point.temp as f64);
+            let m = (f64::from(hi_point.duty) - f64::from(lo_point.duty))
+                / (f64::from(hi_point.temp) - f64::from(lo_point.temp));
+            let b = f64::from(lo_point.duty) - (m * f64::from(lo_point.temp));
 
             for temp in (lo_point.temp + 1)..hi_point.temp {
-                let duty = (m * temp as f64 + b).ceil() as u8;
+                let duty = (m * f64::from(temp) + b).ceil() as u8;
                 TryInsert::try_insert(&mut self.fan_curve, temp, duty)
                     .map_err(|_| anyhow!("Found curve point which should not yet be present"))?;
             }
@@ -135,7 +138,7 @@ struct OccupiedError<'a, K: 'a, V: 'a> {
 
 impl<K: fmt::Debug, V: fmt::Debug> Error for OccupiedError<'_, K, V> {
     #[allow(deprecated)]
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "key already exists"
     }
 }

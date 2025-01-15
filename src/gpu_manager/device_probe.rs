@@ -100,7 +100,7 @@ impl PCIeLink {
                 .max_pcie_link_speed()?
                 .as_integer()
                 .map(u64::from)
-                .map(|x| x * 1000000)
+                .map(|x| x * 1_000_000)
                 .context("Couldn't convert PCIe max link speed")?,
         })
     }
@@ -109,7 +109,7 @@ impl PCIeLink {
         Ok(PCIeLink {
             gen: device.current_pcie_link_gen()?,
             width: device.current_pcie_link_width()?,
-            speed: device.pcie_link_speed().map(u64::from).map(|x| x * 1000000)?,
+            speed: device.pcie_link_speed().map(u64::from).map(|x| x * 1_000_000)?,
         })
     }
 }
