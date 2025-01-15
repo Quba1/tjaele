@@ -36,8 +36,6 @@ enum Commands {
         #[arg(short, long)]
         config_path: Option<PathBuf>,
     },
-    /// Install the utility to start in the background at startup
-    Register,
 }
 
 #[tokio::main]
@@ -48,7 +46,6 @@ async fn main() -> Result<()> {
         match cmd {
             Commands::Monitor { refresh_interval } => monitor_main(refresh_interval).await?,
             Commands::Control { config_path } => control_main(config_path).await?,
-            Commands::Register => register_main(),
         }
     }
 
