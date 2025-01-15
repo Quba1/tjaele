@@ -1,17 +1,7 @@
 use std::time::{Duration, Instant};
 
-use anyhow::{ensure, Context, Result};
-use chrono::{DateTime, Local};
+use anyhow::{ensure, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
-use nvml_wrapper::{
-    cuda_driver_version_major, cuda_driver_version_minor,
-    enum_wrappers::device::{Clock, TemperatureSensor, TemperatureThreshold},
-    enums::device::DeviceArchitecture,
-    struct_wrappers::device::MemoryInfo,
-    structs::device::CudaComputeCapability,
-    Nvml,
-};
-use pretty_bytes::converter::convert;
 use ratatui::{
     buffer::Buffer,
     layout::Rect,

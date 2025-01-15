@@ -5,17 +5,13 @@ mod fan_curve;
 mod intermediate_bindings;
 mod tui_text;
 
-use anyhow::{bail, ensure, Context, Result};
+use anyhow::{ensure, Result};
 use chrono::{DateTime, Local};
 use derive_more::derive::Display;
 use intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeeds};
 use nvml_wrapper::{
-    cuda_driver_version_major, cuda_driver_version_minor,
-    enum_wrappers::device::{Clock, TemperatureSensor, TemperatureThreshold},
-    enums::device::DeviceArchitecture,
-    struct_wrappers::device::MemoryInfo,
-    structs::device::CudaComputeCapability,
-    Device, Nvml,
+    enums::device::DeviceArchitecture, struct_wrappers::device::MemoryInfo,
+    structs::device::CudaComputeCapability, Device, Nvml,
 };
 use ouroboros::self_referencing;
 use rustc_hash::FxHashMap;
@@ -70,7 +66,7 @@ impl GpuManager {
         })
     }
 
-    pub async fn sleep (&self) {
+    pub async fn sleep(&self) {
         tokio::time::sleep(self.control_config.response_time).await;
     }
 }
@@ -115,7 +111,7 @@ impl TjaeleControlConfig {
         cfg.fan_curve.iter().try_for_each(|(_, &fan_duty)| -> Result<()> {
             ensure!(fan_duty <= 100, "Fan duty cannot be higher than 100%");
             Ok(())
-        });
+        })?;
 
         ensure!(cfg.fan_curve.len() >= 3, "Fan curve must have at least 3 points");
 

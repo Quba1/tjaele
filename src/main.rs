@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 mod control;
 mod gpu_manager;
 mod monitor;
@@ -51,5 +49,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-
-fn register_main() {}

@@ -1,21 +1,16 @@
 use std::{
-    collections::{
-        hash_map::{
-            Entry::{Occupied, Vacant},
-            OccupiedEntry,
-        },
-        HashMap,
+    collections::hash_map::{
+        Entry::{Occupied, Vacant},
+        OccupiedEntry,
     },
     error::Error,
     fmt,
-    hash::{Hash, RandomState},
+    hash::Hash,
 };
 
-use crate::gpu_manager::intermediate_bindings::AdditionalNvmlFunctionality;
-
 use super::{GpuManager, TjaeleControlConfig};
-use anyhow::{anyhow, bail, ensure, Context, Result};
-use derive_more::derive::Display;
+use crate::gpu_manager::intermediate_bindings::AdditionalNvmlFunctionality;
+use anyhow::{anyhow, ensure, Context, Result};
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use rustc_hash::FxHashMap;
 

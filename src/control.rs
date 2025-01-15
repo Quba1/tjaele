@@ -1,13 +1,11 @@
-use std::{ffi::OsStr, path::Path, sync::Arc};
-
-use anyhow::{ensure, Context, Result};
+use std::{path::Path, sync::Arc};
 
 use actix_web::{
-    dev::ServerHandle, error::ErrorInternalServerError, get, post, web, App, HttpRequest,
-    HttpResponse, HttpServer, Responder,
+    dev::ServerHandle, error::ErrorInternalServerError, get, App, HttpRequest, HttpResponse,
+    HttpServer, Responder,
 };
-use nvml_wrapper::Nvml;
-use tokio::{task, time::sleep};
+use anyhow::{Context, Result};
+use tokio::task;
 
 use crate::{GpuManager, BIND_IP};
 
