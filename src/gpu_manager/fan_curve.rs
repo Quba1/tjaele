@@ -15,6 +15,7 @@ use crate::gpu_manager::intermediate_bindings::AdditionalNvmlFunctionality;
 use anyhow::{anyhow, ensure, Context, Result};
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use rustc_hash::FxHashMap;
+use tracing::debug;
 
 impl GpuManager {
     /// Returns temperature used for setting duty
@@ -30,6 +31,7 @@ impl GpuManager {
             ..=previous_temp.saturating_add(u32::from(self.control_config.hysteresis));
 
         if hysteresis_range.contains(&new_temp) {
+            debug!("Fan duty not changed - temperature within hysteresis ({new_temp})C");
             return Ok(previous_temp);
         }
 
@@ -47,6 +49,8 @@ impl GpuManager {
                 .set_fan_speed(fan_idx as u32, u32::from(target_duty))
                 .context("Failed to set fan speed")?;
         }
+
+        debug!("Fan duty changed to {target_duty}%, temperature ({new_temp})C");
 
         Ok(new_temp)
     }

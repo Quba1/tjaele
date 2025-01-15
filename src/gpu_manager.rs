@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, path::Path, time::Duration};
+use std::{ffi::OsStr, fmt::Debug, path::Path, time::Duration};
 
 mod device_probe;
 mod fan_curve;
@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::sync::Mutex;
 
+#[derive(Debug)]
 pub struct GpuManager {
     // This is mutexed because I don't know if simulataneous calls to NVML is sound
     // Using Tokio mutex is somewhat justified as it's an IO function
@@ -84,6 +85,15 @@ impl Drop for GpuManager {
                     .expect("Failed to set auto fan control policy upon nvmlcontrol shutdown");
             }
         });
+    }
+}
+
+impl Debug for NvmlHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NvmlHandle")
+            .field("nvml", &self.borrow_nvml())
+            .field("device", &self.borrow_device())
+            .finish()
     }
 }
 

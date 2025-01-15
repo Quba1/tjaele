@@ -44,9 +44,9 @@ impl AdditionalNvmlFunctionality for Device<'_> {
     }
 
     /// [From NVML docs] Normally, the driver dynamically adjusts the fan based on the needs of the GPU.
-    /// But when user set fan speed using nvmlDeviceSetFanSpeed_v2,
-    /// the driver will attempt to make the fan achieve the setting in nvmlDeviceSetFanSpeed_v2.
-    /// The actual current speed of the fan is reported in nvmlDeviceGetFanSpeed_v2.
+    /// But when user set fan speed using `nvmlDeviceSetFanSpeed_v2`,
+    /// the driver will attempt to make the fan achieve the setting in `nvmlDeviceSetFanSpeed_v2`.
+    /// The actual current speed of the fan is reported in `nvmlDeviceGetFanSpeed_v2`.
     fn fan_duty(&self, fan_idx: u32) -> Result<u32, NvmlError> {
         let sym = nvml_sym(self.nvml().nvml_lib().nvmlDeviceGetTargetFanSpeed.as_ref())?;
 

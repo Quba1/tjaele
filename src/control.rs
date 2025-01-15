@@ -1,4 +1,8 @@
-use std::{path::Path, sync::Arc};
+use std::{
+    fmt::Debug,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use actix_web::{
     dev::ServerHandle, error::ErrorInternalServerError, get, App, HttpRequest, HttpResponse,
@@ -6,13 +10,31 @@ use actix_web::{
 };
 use anyhow::{Context, Result};
 use tokio::task;
+use tracing::{error, info, Level};
+use tracing_log::LogTracer;
 
 use crate::{GpuManager, BIND_IP};
 
-pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> {
-    // either /etc/tjaele/config.toml or /etc/tjaele.conf
-    let config_path = config_path.unwrap(); // for now unwrap
+#[tracing::instrument]
+pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Result<()> {
+    let subscriber = tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .with_thread_ids(true)
+        .with_target(true)
+        .with_max_level(Level::INFO)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber)?;
+
+    LogTracer::init()?;
+
+    let config_path = match config_path {
+        Some(p) => p.as_ref().to_owned(),
+        None => PathBuf::from("/etc/tjaele/config.toml"),
+    };
     let gpu_manager = Arc::new(GpuManager::init(config_path)?);
+
+    info!("Successfully initialized connection with NVML");
 
     let gpu_manager1 = gpu_manager.clone();
     let srv = HttpServer::new(move || App::new().app_data(gpu_manager1.clone()).service(gpu_state))
@@ -28,6 +50,7 @@ pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> 
 }
 
 #[get("/gpustate")]
+#[tracing::instrument]
 async fn gpu_state(req: HttpRequest) -> impl Responder {
     let gpu_manager = req.app_data::<Arc<GpuManager>>().expect("Failed to extract GpuManager");
     let gpu_device_state = gpu_manager.read_state().await;
@@ -44,13 +67,14 @@ async fn gpu_state(req: HttpRequest) -> impl Responder {
     }
 }
 
+#[tracing::instrument]
 async fn fan_control(gpu_manager: Arc<GpuManager>, server_handle: ServerHandle) {
     let mut gpu_temp = 0;
     loop {
         match gpu_manager.set_duty_with_curve(gpu_temp).await {
             Ok(t) => gpu_temp = t,
             Err(e) => {
-                println!("Fan control failed with error: {e}. Shutting down.");
+                error!("Fan control failed with error: {e}. Shutting down.");
                 server_handle.stop(true).await;
             },
         }
