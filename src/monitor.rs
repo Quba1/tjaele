@@ -140,10 +140,9 @@ fn render_probe_result(result: &Result<MonitorData>) -> Text<'static> {
     match result {
         Ok(data) => return data.to_tui_text(),
         Err(err) => {
-            let mut lines =
-                vec![Line::from(vec!["Tjaele Monitor failed to acquire GPU data with error chain: "
-                    .to_string()
-                    .yellow()])];
+            let mut lines = vec![Line::from(vec![
+                "Tjaele Monitor failed to acquire GPU data with error chain: ".to_string().yellow(),
+            ])];
 
             for (i, e) in err.chain().enumerate() {
                 lines.push(Line::from(vec![format!("[{i}]: {e}\n").into()]));
