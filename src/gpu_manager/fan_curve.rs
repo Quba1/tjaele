@@ -20,8 +20,7 @@ use tracing::debug;
 impl GpuManager {
     /// Returns temperature used for setting duty
     pub async fn set_duty_with_curve(&self, previous_temp: u32) -> Result<u32> {
-        let handle = self.nvml_handle.lock().await;
-        let device = handle.borrow_device();
+        let device = self.nvml_handle.borrow_device();
 
         let new_temp =
             device.temperature(TemperatureSensor::Gpu).context("Failed to read GPU temperature")?;

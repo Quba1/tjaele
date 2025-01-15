@@ -16,14 +16,13 @@ use ouroboros::self_referencing;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
-use tokio::sync::Mutex;
 use tracing::info;
 
 #[derive(Debug)]
 pub struct GpuManager {
     // This is mutexed because I don't know if simulataneous calls to NVML is sound
     // Using Tokio mutex is somewhat justified as it's an IO function
-    nvml_handle: Mutex<NvmlHandle>,
+    nvml_handle: NvmlHandle,
     persistent_params: PersistentGpuParams,
     pub control_config: TjaeleControlConfig,
 }
@@ -54,13 +53,13 @@ impl GpuManager {
 
         let persistent_params = PersistentGpuParams::init(&nvml_handle)?;
 
-        Ok(GpuManager { nvml_handle: Mutex::new(nvml_handle), persistent_params, control_config })
+        Ok(GpuManager { nvml_handle, persistent_params, control_config })
     }
 
     pub async fn read_state(&self) -> Result<GpuState> {
         Ok(GpuState {
             runtime: RuntimeGpuParams::read_from_device(
-                self.nvml_handle.lock().await.borrow_device(),
+                self.nvml_handle.borrow_device(),
                 self.persistent_params.num_fans,
             )?,
             persistent: self.persistent_params.clone(),
@@ -75,17 +74,14 @@ impl GpuManager {
 
 impl Drop for GpuManager {
     fn drop(&mut self) {
-        tokio::task::block_in_place(|| {
-            let handle = self.nvml_handle.blocking_lock();
-            let device = handle.borrow_device();
+        let device = self.nvml_handle.borrow_device();
 
-            for fan_idx in 0..self.persistent_params.num_fans {
-                device.set_default_fan_speed(fan_idx as u32)
+        for fan_idx in 0..self.persistent_params.num_fans {
+            device.set_default_fan_speed(fan_idx as u32)
                     // We panic here on purpose, so that failure "wreaks havoc"
                     // Ignoring error here could be potentially dangerous for the GPU
                     .expect("Failed to set auto fan control policy upon nvmlcontrol shutdown");
-            }
-        });
+        }
     }
 }
 
