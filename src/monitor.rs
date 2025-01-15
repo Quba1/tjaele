@@ -45,12 +45,13 @@ pub async fn monitor_main(refresh_interval: f64) -> Result<()> {
         "Monitor refresh interval must be between 0.1 and 10 secods"
     );
 
+    // App is fallibly inited first to not mess up terminal
+    let mut app = App::init().await?;
     let mut terminal = ratatui::try_init()?;
 
-    let app_result =
-        App::init().await?.run(&mut terminal, Duration::from_secs_f64(refresh_interval)).await;
-    // TODO: error breaks terminal (although it shouldn't)
+    let app_result = app.run(&mut terminal, Duration::from_secs_f64(refresh_interval)).await;
     ratatui::try_restore()?;
+
     app_result
 }
 
