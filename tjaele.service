@@ -1,0 +1,11 @@
+[Unit]
+Description=Nvidia Fan Control for Wayland
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tjaele control
+RestartSec=5
+Restart=always
+
+[Install]
+WantedBy=graphical.target

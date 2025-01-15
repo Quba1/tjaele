@@ -17,6 +17,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_with::serde_as;
 use tokio::sync::Mutex;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct GpuManager {
@@ -36,7 +37,7 @@ struct NvmlHandle {
 }
 
 impl GpuManager {
-    pub fn init<P: AsRef<Path>>(config_path: P) -> Result<Self> {
+    pub fn init<P: AsRef<Path> + Debug>(config_path: P) -> Result<Self> {
         let control_config =
             TjaeleControlConfig::new_from_file(config_path)?.precompute_fan_curve()?;
 
@@ -108,8 +109,8 @@ pub struct TjaeleControlConfig {
 }
 
 impl TjaeleControlConfig {
-    pub(self) fn new_from_file<Q: AsRef<Path>>(path: Q) -> Result<Self> {
-        let cfg = std::fs::read_to_string(path)?;
+    pub(self) fn new_from_file<Q: AsRef<Path> + Debug>(path: Q) -> Result<Self> {
+        let cfg = std::fs::read_to_string(&path)?;
         let cfg: Self = toml::from_str(&cfg)?;
 
         ensure!(cfg.hysteresis > 0 && cfg.hysteresis <= 5, "Hysteresis must be between 1C and 5C");
@@ -124,6 +125,8 @@ impl TjaeleControlConfig {
         })?;
 
         ensure!(cfg.fan_curve.len() >= 3, "Fan curve must have at least 3 points");
+
+        info!("Config loaded from {path:?}");
 
         Ok(cfg)
     }

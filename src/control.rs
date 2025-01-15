@@ -30,7 +30,7 @@ pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Res
 
     let config_path = match config_path {
         Some(p) => p.as_ref().to_owned(),
-        None => PathBuf::from("/etc/tjaele/config.toml"),
+        None => PathBuf::from("/usr/local/etc/tjaele/config.toml"),
     };
     let gpu_manager = Arc::new(GpuManager::init(config_path)?);
 
@@ -42,6 +42,7 @@ pub async fn control_main<P: AsRef<Path> + Debug>(config_path: Option<P>) -> Res
         .bind((BIND_IP, 8080))?
         .run();
 
+    // technically this can allow for a brief moment to have two instances running
     task::spawn(fan_control(gpu_manager.clone(), srv.handle()));
 
     srv.await.context(
