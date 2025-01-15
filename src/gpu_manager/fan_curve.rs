@@ -32,7 +32,7 @@ impl GpuManager {
             ..=previous_temp.saturating_add(self.control_config.hysteresis as u32);
 
         if hysteresis_range.contains(&new_temp) {
-            return Ok(new_temp);
+            return Ok(previous_temp);
         }
 
         let temp_8bit =
@@ -43,8 +43,6 @@ impl GpuManager {
             .get(&temp_8bit)
             .context("Missing fan curve point - this should not happen")?;
         ensure!(target_duty <= 100, "Fan duty failed sanity check - this should not happen");
-
-        println!("{new_temp}: {target_duty}");
 
         for fan_idx in 0..self.persistent_params.num_fans {
             device
