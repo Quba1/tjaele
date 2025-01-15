@@ -16,6 +16,7 @@ pub struct MinMaxFanSpeeds {
 pub trait AdditionalNvmlFunctionality {
     fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeeds, NvmlError>;
     fn fan_control_policy(&self, fan_idx: u32) -> Result<u32, NvmlError>;
+    fn fan_duty(&self, fan_idx: u32) -> Result<u32, NvmlError>;
     fn set_fan_speed(&self, fan_idx: u32, fan_speed: u32) -> Result<(), NvmlError>;
     fn set_default_fan_speed(&self, fan_idx: u32) -> Result<(), NvmlError>;
 }
@@ -40,6 +41,19 @@ impl AdditionalNvmlFunctionality for Device<'_> {
         unsafe { nvml_try(sym(self.handle(), fan_idx, &mut policy))? }
 
         Ok(policy)
+    }
+
+    /// [From NVML docs] Normally, the driver dynamically adjusts the fan based on the needs of the GPU.
+    /// But when user set fan speed using nvmlDeviceSetFanSpeed_v2,
+    /// the driver will attempt to make the fan achieve the setting in nvmlDeviceSetFanSpeed_v2.
+    /// The actual current speed of the fan is reported in nvmlDeviceGetFanSpeed_v2.
+    fn fan_duty(&self, fan_idx: u32) -> Result<u32, NvmlError> {
+        let sym = nvml_sym(self.nvml().nvml_lib().nvmlDeviceGetTargetFanSpeed.as_ref())?;
+
+        let mut duty = 0;
+        unsafe { nvml_try(sym(self.handle(), fan_idx, &mut duty))? }
+
+        Ok(duty)
     }
 
     /// Disables automatic fan control and sets provided fan speed

@@ -10,7 +10,7 @@ use tokio::task;
 use crate::{GpuManager, BIND_IP};
 
 pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> {
-    //this must run as sudo so maybe /etc/config
+    // either /etc/tjaele/config.toml or /etc/tjaele.conf
     let config_path = config_path.unwrap(); // for now unwrap
     let gpu_manager = Arc::new(GpuManager::init(config_path)?);
 

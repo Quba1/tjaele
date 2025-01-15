@@ -3,7 +3,6 @@ use std::{ffi::OsStr, path::Path, time::Duration};
 mod device_probe;
 mod fan_curve;
 mod intermediate_bindings;
-mod tui_text;
 
 use anyhow::{ensure, Result};
 use chrono::{DateTime, Local};
@@ -63,6 +62,7 @@ impl GpuManager {
                 self.persistent_params.num_fans,
             )?,
             persistent: self.persistent_params.clone(),
+            fan_curve: self.control_config.fan_curve.iter().map(|(t, d)| (*t, *d)).collect(),
         })
     }
 
@@ -123,6 +123,7 @@ impl TjaeleControlConfig {
 pub struct GpuState {
     pub runtime: RuntimeGpuParams,
     pub persistent: PersistentGpuParams,
+    pub fan_curve: Vec<(u8, u8)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -187,7 +188,10 @@ pub struct CudaVersion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FanState {
     pub index: usize,
+    /// Actual fan speed
     pub speed: u32,
+    /// Speed fan is set to
+    pub duty: u32,
     pub control_policy: FanControlPolicy,
 }
 

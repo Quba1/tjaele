@@ -1,22 +1,23 @@
 #![allow(clippy::cast_precision_loss)]
 
+mod tui_blocks;
+
 use std::time::{Duration, Instant};
 
 use anyhow::{ensure, Context, Result};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    style::Stylize,
-    symbols::border,
-    text::{Line, Text},
-    widgets::{Block, Paragraph, Widget},
+    layout::{Constraint, Direction, Layout},
     DefaultTerminal, Frame,
 };
 // no need for blocking client, because Reqwest runs Tokio anyway
 use reqwest::{Client, ClientBuilder};
 
 use crate::{GpuState, BIND_IP};
+use tui_blocks::{
+    render_cooling_chart, render_fans_table, DeviceBlock, DriverBlock, ErrorBlock, SpecsBlock,
+    TemperatureBlock, TimeBlock,
+};
 
 #[derive(Debug)]
 pub struct App {
@@ -87,20 +88,52 @@ impl App {
     }
 
     fn draw(&self, frame: &mut Frame) {
-        frame.render_widget(self, frame.area());
+        match &self.latest_data {
+            Ok(data) => App::draw_normal_frame(frame, data),
+            Err(err) => App::draw_error_frame(frame, err),
+        }
     }
-}
 
-impl Widget for &App {
-    fn render(self, area: Rect, buf: &mut Buffer) {
-        let title = Line::from("Tjaele Monitor".bold());
-        let instructions = Line::from(vec![" Quit ".into(), "<Q> ".blue().bold()]);
-        let block = Block::bordered()
-            .title(title.centered())
-            .title_bottom(instructions.centered())
-            .border_set(border::THICK);
+    fn draw_normal_frame(frame: &mut Frame, data: &MonitorData) {
+        let main_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Length(10), Constraint::Fill(1)])
+            .split(frame.area());
 
-        Paragraph::new(render_probe_result(&self.latest_data)).block(block).render(area, buf);
+        let upper_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+                Constraint::Ratio(1, 3),
+            ])
+            .split(main_layout[0]);
+
+        let lower_layout = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
+            .split(main_layout[1]);
+
+        let cooler_layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![
+                Constraint::Length(4),
+                Constraint::Length(data.gpu_state.persistent.num_fans as u16 + 3),
+                Constraint::Fill(1),
+            ])
+            .split(lower_layout[0]);
+
+        frame.render_widget(TimeBlock { data }, upper_layout[0]);
+        frame.render_widget(DeviceBlock { data }, upper_layout[1]);
+        frame.render_widget(DriverBlock { data }, upper_layout[2]);
+        frame.render_widget(TemperatureBlock { data }, cooler_layout[0]);
+        render_fans_table(frame, data, cooler_layout[1]);
+        render_cooling_chart(frame, data, cooler_layout[2]);
+        frame.render_widget(SpecsBlock { data }, lower_layout[1]);
+    }
+
+    fn draw_error_frame(frame: &mut Frame, error: &anyhow::Error) {
+        frame.render_widget(ErrorBlock { error }, frame.area());
     }
 }
 
@@ -120,35 +153,5 @@ impl MonitorData {
         let elapsed = now.elapsed();
 
         Ok(MonitorData { gpu_state: gpu_device_state, latency: elapsed })
-    }
-
-    pub fn to_tui_text(&self) -> Text<'static> {
-        let latency = self.latency.as_nanos() as f64 / 1_000_000.0;
-
-        let mut lines = vec![Line::from(vec![
-            "Monitor Latency: ".to_string().yellow(),
-            format!("{latency} ms").into(),
-        ])];
-
-        lines.append(&mut self.gpu_state.render_tui_lines());
-
-        Text::from(lines)
-    }
-}
-
-fn render_probe_result(result: &Result<MonitorData>) -> Text<'static> {
-    match result {
-        Ok(data) => return data.to_tui_text(),
-        Err(err) => {
-            let mut lines = vec![Line::from(vec![
-                "Tjaele Monitor failed to acquire GPU data with error chain: ".to_string().yellow(),
-            ])];
-
-            for (i, e) in err.chain().enumerate() {
-                lines.push(Line::from(vec![format!("[{i}]: {e}\n").into()]));
-            }
-
-            lines.into()
-        },
     }
 }

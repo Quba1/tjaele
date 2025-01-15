@@ -132,6 +132,9 @@ impl FanState {
             speed: device
                 .fan_speed(index as u32)
                 .with_context(|| format!("Failed to read fan_{index} speed"))?,
+            duty: device
+                .fan_duty(index as u32)
+                .with_context(|| format!("Failed to read fan_{index} duty"))?,
             control_policy: device
                 .fan_control_policy(index as u32)
                 .with_context(|| format!("Failed to read fan_{index} policy"))?
