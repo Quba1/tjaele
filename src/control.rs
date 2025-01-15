@@ -16,6 +16,7 @@ pub async fn control_main<P: AsRef<Path>>(config_path: Option<P>) -> Result<()> 
 
     let gpu_manager1 = gpu_manager.clone();
     let srv = HttpServer::new(move || App::new().app_data(gpu_manager1.clone()).service(gpu_state))
+        .workers(4)
         .bind((BIND_IP, 8080))?
         .run();
 

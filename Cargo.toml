@@ -44,3 +44,8 @@ derive_more = { version = "1.0.0", default-features = false, features = [
     "std",
     "display",
 ] }
+
+[profile.release]
+strip = "symbols"
+lto = true
+codegen-units = 1

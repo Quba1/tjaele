@@ -44,7 +44,7 @@ enum Commands {
     },
 }
 
-#[tokio::main]
+#[tokio::main(worker_threads = 4)]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
