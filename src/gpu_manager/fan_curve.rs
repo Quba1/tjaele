@@ -11,10 +11,50 @@ use std::{
     hash::{Hash, RandomState},
 };
 
-use super::TjaeleControlConfig;
+use crate::gpu_manager::intermediate_bindings::AdditionalNvmlFunctionality;
+
+use super::{GpuManager, TjaeleControlConfig};
 use anyhow::{anyhow, bail, ensure, Context, Result};
 use derive_more::derive::Display;
+use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use rustc_hash::FxHashMap;
+
+impl GpuManager {
+    /// Returns temperature used for setting duty
+    pub async fn set_duty_with_curve(&self, previous_temp: u32) -> Result<u32> {
+        let handle = self.nvml_handle.lock().await;
+        let device = handle.borrow_device();
+
+        let new_temp =
+            device.temperature(TemperatureSensor::Gpu).context("Failed to read GPU temperature")?;
+
+        let hysteresis_range = previous_temp.saturating_sub(self.control_config.hysteresis as u32)
+            ..=previous_temp.saturating_add(self.control_config.hysteresis as u32);
+
+        if hysteresis_range.contains(&new_temp) {
+            return Ok(new_temp);
+        }
+
+        let temp_8bit =
+            u8::try_from(new_temp).context("Your device somehow is warmer than 255C")?;
+        let target_duty = *self
+            .control_config
+            .fan_curve
+            .get(&temp_8bit)
+            .context("Missing fan curve point - this should not happen")?;
+        ensure!(target_duty <= 100, "Fan duty failed sanity check - this should not happen");
+
+        println!("{new_temp}: {target_duty}");
+
+        for fan_idx in 0..self.persistent_params.num_fans {
+            device
+                .set_fan_speed(fan_idx as u32, target_duty as u32)
+                .context("Failed to set fan speed")?;
+        }
+
+        Ok(new_temp)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 struct FanCurvePoint {
@@ -74,8 +114,6 @@ impl TjaeleControlConfig {
     fn validate_fan_curve(&self) -> Result<()> {
         let mut curve_points = self.fan_curve.iter().map(FanCurvePoint::from).collect::<Vec<_>>();
         curve_points.sort_by_key(|pt| pt.temp);
-
-        dbg!(&curve_points);
 
         for i in 0..curve_points.len() - 1 {
             let lo_point = curve_points[i];

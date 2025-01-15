@@ -1,7 +1,7 @@
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, path::Path, time::Duration};
 
 mod device_probe;
-mod fan_control;
+mod fan_curve;
 mod intermediate_bindings;
 mod tui_text;
 
@@ -28,7 +28,7 @@ pub struct GpuManager {
     // Using Tokio mutex is somewhat justified as it's an IO function
     nvml_handle: Mutex<NvmlHandle>,
     persistent_params: PersistentGpuParams,
-    control_config: TjaeleControlConfig,
+    pub control_config: TjaeleControlConfig,
 }
 
 #[self_referencing]
@@ -43,9 +43,6 @@ impl GpuManager {
     pub fn init<P: AsRef<Path>>(config_path: P) -> Result<Self> {
         let control_config =
             TjaeleControlConfig::new_from_file(config_path)?.precompute_fan_curve()?;
-
-        dbg!(&control_config);
-        todo!();
 
         // recommended path for loading nvml
         let nvml = Nvml::builder().lib_path(OsStr::new("libnvidia-ml.so.1")).init()?;
@@ -72,6 +69,10 @@ impl GpuManager {
             persistent: self.persistent_params.clone(),
         })
     }
+
+    pub async fn sleep (&self) {
+        tokio::time::sleep(self.control_config.response_time).await;
+    }
 }
 
 impl Drop for GpuManager {
@@ -93,7 +94,8 @@ impl Drop for GpuManager {
 #[serde_as]
 #[derive(Debug, Clone, Deserialize)]
 pub struct TjaeleControlConfig {
-    pub response_time: f64,
+    #[serde_as(as = "serde_with::DurationSecondsWithFrac<f64>")]
+    pub response_time: Duration,
     pub hysteresis: u16,
     #[serde_as(as = "Vec<(_, _)>")]
     pub fan_curve: FxHashMap<u8, u8>,
@@ -105,7 +107,10 @@ impl TjaeleControlConfig {
         let cfg: Self = toml::from_str(&cfg)?;
 
         ensure!(cfg.hysteresis > 0 && cfg.hysteresis <= 5, "Hysteresis must be between 1C and 5C");
-        ensure!(cfg.response_time >= 0.25, "Response time must be at least than 0.25 seconds");
+        ensure!(
+            cfg.response_time.as_secs_f64() >= 0.25,
+            "Response time must be at least than 0.25 seconds"
+        );
 
         cfg.fan_curve.iter().try_for_each(|(_, &fan_duty)| -> Result<()> {
             ensure!(fan_duty <= 100, "Fan duty cannot be higher than 100%");
