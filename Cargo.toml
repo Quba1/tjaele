@@ -1,5 +1,5 @@
 [workspace]
-members = ["scalewx_engine", "geoarray", "warp_init"]
+members = ["tjaele", "tjaeled", "tjaele-types"]
 resolver = "2"
 
 [workspace.dependencies]
