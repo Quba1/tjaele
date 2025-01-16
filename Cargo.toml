@@ -1,10 +1,8 @@
-[package]
-name = "tjaele"
-version = "0.1.0"
-edition = "2021"
-publish = false
+[workspace]
+members = ["scalewx_engine", "geoarray", "warp_init"]
+resolver = "2"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = { version = "1.0.95", default-features = false, features = ["std"] }
 clap = { version = "4.5.26", default-features = true, features = ["derive"] }
 nvml-wrapper = { git = "https://github.com/Quba1/nvml-wrapper.git", default-features = false, features = [
@@ -53,3 +51,12 @@ tracing-log = { version = "0.2.0", default-features = true }
 strip = "symbols"
 lto = true
 codegen-units = 1
+
+[workspace.lints.clippy]
+pedantic = "warn"
+cargo = "warn"
+perf = "warn"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+cast_possible_truncation = "allow"
+multiple_crate_versions = "allow"
