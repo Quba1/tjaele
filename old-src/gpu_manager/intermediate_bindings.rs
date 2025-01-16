@@ -7,11 +7,7 @@ use nvml_wrapper::{
 use nvml_wrapper_sys::bindings::nvmlFanControlPolicy_t;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct MinMaxFanSpeeds {
-    pub min: u32,
-    pub max: u32,
-}
+
 
 pub trait AdditionalNvmlFunctionality {
     fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeeds, NvmlError>;

@@ -5,9 +5,7 @@ resolver = "2"
 [workspace.dependencies]
 anyhow = { version = "1.0.95", default-features = false, features = ["std"] }
 clap = { version = "4.5.26", default-features = true, features = ["derive"] }
-nvml-wrapper = { git = "https://github.com/Quba1/nvml-wrapper.git", default-features = false, features = [
-    "serde",
-] }
+nvml-wrapper = { git = "https://github.com/Quba1/nvml-wrapper.git", default-features = false }
 nvml-wrapper-sys = { version = "0.8.0", default-features = true }
 pretty-bytes = { version = "0.2.2", default-features = false }
 ratatui = { version = "0.29.0", default-features = false, features = [
