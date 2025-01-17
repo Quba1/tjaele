@@ -20,3 +20,5 @@ cp ./tjaele.service /usr/local/lib/systemd/system/tjaele.service
 systemctl daemon-reload
 systemctl enable tjaele
 systemctl start tjaele
+
+echo "Now edit config.toml file in /usr/local/etc/tjaele"

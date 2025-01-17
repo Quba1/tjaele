@@ -21,5 +21,9 @@ serde = { workspace = true }
 serde_with = { workspace = true }
 toml = { workspace = true }
 tokio-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+http-body-util = { workspace = true }
+serde_json = { workspace = true }
 
 tjaele_types = { path = "../tjaele_types", features = ["nvml_types"] }

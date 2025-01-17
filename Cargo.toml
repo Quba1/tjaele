@@ -26,12 +26,15 @@ tokio = { version = "1.43.0", default-features = false, features = [
 ] }
 tokio-util = { version = "0.7.13", default-features = false }
 ouroboros = { version = "0.18.5", default-features = false, features = ["std"] }
+
 serde = { version = "1.0.217", default-features = false, features = ["derive"] }
-toml = { version = "0.8.19", default-features = false, features = ["parse"] }
 serde_with = { version = "3.12.0", default-features = false, features = [
     "std",
     "macros",
 ] }
+toml = { version = "0.8.19", default-features = false, features = ["parse"] }
+serde_json = {version = "1.0.135", default-features = false, features = ["std"]}
+
 rustc-hash = { version = "2.1.0", default-features = false, features = ["std"] }
 derive_more = { version = "1.0.0", default-features = false, features = [
     "std",
@@ -41,6 +44,15 @@ derive_more = { version = "1.0.0", default-features = false, features = [
 tracing = { version = "0.1.41", default-features = true }
 tracing-subscriber = { version = "0.3.19", default-features = true }
 tracing-log = { version = "0.2.0", default-features = true }
+
+hyper = { version = "1.5.2", default-features = false, features = [
+    "http1",
+    "server",
+] }
+hyper-util = { version = "0.1.10", default-features = false, features = [
+    "tokio",
+] }
+http-body-util = { version = "0.1.2", default-features = false }
 
 [profile.release]
 strip = "symbols"

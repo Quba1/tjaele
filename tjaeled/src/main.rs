@@ -5,7 +5,11 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::{anyhow, Context, Result};
 use clap::{command, Parser};
 use gpu_manager::GpuManager;
-use tjaele_types::GpuState;
+use http_body_util::Full;
+use hyper::body::{Bytes, Incoming};
+use hyper::{server::conn::http1, service::service_fn};
+use hyper::{Method, Request, Response, StatusCode};
+use hyper_util::rt::TokioIo;
 use tokio::{
     net::{UnixListener, UnixStream},
     select, task,
@@ -15,7 +19,12 @@ use tracing::{debug, error, info, Level};
 use tracing_log::LogTracer;
 
 #[derive(Parser)]
-#[command(version, about = "about", long_about = "long about", arg_required_else_help = true)]
+#[command(
+    version,
+    about = "Nvidia Fan Control for Wayland",
+    long_about = "long about",
+    arg_required_else_help = true
+)]
 struct Cli {
     /// Path to the configuration file
     #[arg(short, long, required = true)]
@@ -76,36 +85,53 @@ async fn unix_socket_server(
     }
 }
 
-async fn handle_socket_stream(stream: UnixStream, gpu_manager: Arc<GpuManager>) {
-    // errors need to be handled internally because we can't propagate them up
+async fn handle_socket_stream(io_stream: UnixStream, gpu_manager: Arc<GpuManager>) {
+    let io = TokioIo::new(io_stream);
+    let gmanager = gpu_manager.clone();
 
-    // connect
-    // validate request type
-    // respond to request
-
-    let gpu_state = task::spawn_blocking(|| get_gpu_state(gpu_manager)).await;
-
-    todo!()
+    task::spawn(async move {
+        if let Err(err) = http1::Builder::new()
+            .serve_connection(io, service_fn(|req| handle_http_request(req, gmanager.clone())))
+            .await
+        {
+            error!("Error serving connection: {err}")
+        }
+    });
 }
 
 #[tracing::instrument]
-fn get_gpu_state(gpu_manager: Arc<GpuManager>) -> Result<GpuState> {
-    let gpu_device_state = gpu_manager.read_state();
+async fn handle_http_request(
+    req: Request<Incoming>,
+    gpu_manager: Arc<GpuManager>,
+) -> Result<Response<Full<Bytes>>, hyper::http::Error> {
+    if req.method() != Method::GET || req.uri().path() != "/gpustate" {
+        return Response::builder().status(StatusCode::NOT_FOUND).body(Full::new(Bytes::from("")));
+    }
 
-    // to enum
-    // serialize
+    let gpu_state = task::spawn_blocking(move || gpu_manager.read_state())
+        .await
+        .map_err(|err| anyhow!("Join error: {err}"))
+        .and_then(std::convert::identity) //flatten the error
+        .and_then(|state| {
+            serde_json::to_string(&state).map_err(|err| anyhow!("Serialization failed: {err}"))
+        });
 
-    // match gpu_device_state {
-    //     Ok(state) => HttpResponse::Ok().json(state),
-    //     Err(err) => {
-    //         let mut error_text = "Error chain:\n".to_string();
-    //         for (i, e) in err.chain().enumerate() {
-    //             error_text.push_str(&format!("[{i}]: {e}\n"));
-    //         }
-    //         ErrorInternalServerError(error_text).error_response()
-    //     },
-    // }
-    todo!()
+    match gpu_state {
+        Ok(state) => {
+            let body = Bytes::from(state);
+            let body = Full::new(body);
+            Response::builder().status(StatusCode::OK).body(body)
+        },
+        Err(err) => {
+            let mut error_text = "Error chain:\n".to_string();
+            for (i, e) in err.chain().enumerate() {
+                error_text.push_str(&format!("[{i}]: {e}\n"));
+            }
+            let body = Bytes::from(error_text);
+            let body = Full::new(body);
+            Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(body)
+        },
+    }
 }
 
 #[tracing::instrument]
@@ -116,20 +142,18 @@ async fn fan_control(gpu_manager: Arc<GpuManager>, server_token: CancellationTok
     loop {
         let gpu_manager_clone = gpu_manager.clone();
         let fan_control_result =
-            task::spawn_blocking(move || gpu_manager_clone.set_duty_with_curve(gpu_temp)).await;
+            task::spawn_blocking(move || gpu_manager_clone.set_duty_with_curve(gpu_temp))
+                .await
+                .map_err(|err| anyhow!("Join error: {err}"))
+                .and_then(std::convert::identity); //flatten the error
 
-        // match fan_control_result {
-        //     Ok(Ok(_)) => todo!(),
-        //     Err(_) => todo!(),
-        // }
-
-        // match gpu_manager.set_duty_with_curve(gpu_temp) {
-        //     Ok(t) => gpu_temp = t,
-        //     Err(e) => {
-        //         error!("Fan control failed with error: {e}. Shutting down.");
-        //         todo!("Stop server")
-        //     },
-        // }
+        match fan_control_result {
+            Ok(t) => gpu_temp = t,
+            Err(e) => {
+                error!("Fan control failed with error: {e}. Shutting down.");
+                server_token.cancel();
+            },
+        }
 
         gpu_manager.sleep().await;
     }
