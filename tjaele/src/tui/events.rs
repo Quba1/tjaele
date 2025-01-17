@@ -47,13 +47,10 @@ impl EventHandler {
                     sender.send(Event::Tick).unwrap();
                   }
                   Some(Ok(evt)) = crossterm_event => {
-                    match evt {
-                      CrosstermEvent::Key(key) => {
-                        if key.kind == crossterm::event::KeyEventKind::Press {
-                          sender.send(Event::Key(key)).unwrap();
-                        }
-                      },
-                      _ => {},
+                    if let CrosstermEvent::Key(key) = evt {
+                      if key.kind == crossterm::event::KeyEventKind::Press {
+                        sender.send(Event::Key(key)).unwrap();
+                      }
                     }
                   }
                 };

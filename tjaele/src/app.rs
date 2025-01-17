@@ -1,6 +1,5 @@
 use std::time::{Duration, Instant};
 
-
 use anyhow::{Context, Result};
 use crossterm::event::KeyCode;
 use http_body_util::{BodyExt, Empty};
@@ -73,7 +72,7 @@ impl UdsClient {
         // Spawn a task to poll the connection, driving the HTTP state
         tokio::task::spawn(async move {
             // When this error occurs, the function errors
-            if let Err(_) = conn.await {}
+            if (conn.await).is_err() {}
         });
 
         let req = Request::builder().uri("/gpustate").body(Empty::<Bytes>::new())?;

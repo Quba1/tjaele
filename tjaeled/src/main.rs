@@ -226,6 +226,7 @@ impl Drop for VolatileSocket {
         // There's no way to return a useful error here
         std::fs::remove_file(&self.path)
             .expect("Failed to remove tjaeled.sock, please remove it manually");
+        debug!("Socket successfully removed");
     }
 }
 
