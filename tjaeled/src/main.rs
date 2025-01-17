@@ -1,8 +1,13 @@
 mod gpu_manager;
 
+use std::fmt::Debug;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::Path;
+
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use clap::{command, Parser};
 use gpu_manager::GpuManager;
 use http_body_util::Full;
@@ -10,18 +15,20 @@ use hyper::body::{Bytes, Incoming};
 use hyper::{server::conn::http1, service::service_fn};
 use hyper::{Method, Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use tjaele_types::SOCKET;
+use tokio::signal::unix::SignalKind;
 use tokio::{
     net::{UnixListener, UnixStream},
     select, task,
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, Level};
+use tracing::{debug, error, info, warn, Level};
 use tracing_log::LogTracer;
 
 #[derive(Parser)]
 #[command(
     version,
-    about = "Nvidia Fan Control for Wayland",
+    about = "Nvidia Fan Control for Wayland (service)",
     long_about = "long about",
     arg_required_else_help = true
 )]
@@ -39,15 +46,20 @@ async fn main() -> Result<()> {
         .with_line_number(true)
         .with_thread_ids(true)
         .with_target(true)
-        .with_max_level(Level::INFO)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)?;
+        .compact();
+
+    #[cfg(debug_assertions)]
+    let subscriber = subscriber.with_max_level(Level::DEBUG);
+    #[cfg(not(debug_assertions))]
+    let subscriber = subscriber.with_max_level(Level::INFO);
+
+    tracing::subscriber::set_global_default(subscriber.finish())?;
     LogTracer::init()?;
 
     let cli = Cli::parse();
 
-    let socket_listener = UnixListener::bind("/var/run/tjaele/tjaele.sock").context(
-        "Failed to bind to socket, this is most likely because another tjaele instance is running",
+    let socket_listener = VolatileSocket::bind(SOCKET).context(
+        "Failed to bind to socket, this is most likely because another tjaele instance is running or you are running without sudo",
     )?;
 
     let gpu_manager = task::spawn_blocking(|| GpuManager::init(cli.config_path)).await??;
@@ -61,15 +73,16 @@ async fn main() -> Result<()> {
     tokio::spawn(fan_control(gpu_manager_clone, server_token));
 
     select! {
-        _ = child_token.cancelled() => {return Err(anyhow!("Server has been stopped by error in Fan Controller"))}
         res = unix_socket_server(gpu_manager, socket_listener) => {return res}
+        _ = child_token.cancelled() => {error!("Server has been stopped by error in Fan Controller"); bail!("")}
+        r = capture_signals() => {return r}
     }
 }
 
 #[tracing::instrument]
 async fn unix_socket_server(
     gpu_manager: Arc<GpuManager>,
-    socket_listener: UnixListener,
+    socket_listener: VolatileSocket,
 ) -> Result<()> {
     loop {
         match socket_listener.accept().await {
@@ -85,6 +98,7 @@ async fn unix_socket_server(
     }
 }
 
+#[tracing::instrument]
 async fn handle_socket_stream(io_stream: UnixStream, gpu_manager: Arc<GpuManager>) {
     let io = TokioIo::new(io_stream);
     let gmanager = gpu_manager.clone();
@@ -156,5 +170,75 @@ async fn fan_control(gpu_manager: Arc<GpuManager>, server_token: CancellationTok
         }
 
         gpu_manager.sleep().await;
+    }
+}
+
+/// This doesn't handle signals entirely as intended
+/// But we need to make sure that we set auto fan policy and
+/// remove socket as often as possible
+#[tracing::instrument]
+async fn capture_signals() -> Result<()> {
+    let sigint = tokio::spawn(capture_signal(SignalKind::interrupt()));
+    let sigquit = tokio::spawn(capture_signal(SignalKind::quit()));
+    let sigterm = tokio::spawn(capture_signal(SignalKind::terminate()));
+    let sighup = tokio::spawn(capture_signal(SignalKind::hangup()));
+
+    select! {
+        r = sigint => {let r = r?; return r}
+        r = sigquit => {let r = r?; return r}
+        r = sigterm => {let r = r?; return r}
+        r = sighup => {let r = r?; return r}
+    }
+}
+
+#[tracing::instrument]
+async fn capture_signal(signal_kind: SignalKind) -> Result<()> {
+    let mut sig = tokio::signal::unix::signal(signal_kind)?;
+    sig.recv().await.context("No more signals can be received")?;
+    error!("Received signal {signal_kind:?}");
+
+    Ok(())
+}
+
+#[derive(Debug)]
+struct VolatileSocket {
+    path: PathBuf,
+    listener: UnixListener,
+}
+
+impl VolatileSocket {
+    #[tracing::instrument]
+    fn bind<T: AsRef<Path> + Debug>(path: T) -> Result<Self> {
+        let path = path.as_ref().to_owned();
+        let listener = UnixListener::bind(&path).context("Failed to bind socket")?;
+
+        let mut perms = fs::metadata(&path)?.permissions();
+        perms.set_mode(0o666);
+        fs::set_permissions(&path, perms)?;
+        debug!("Socket permissions set");
+
+        Ok(VolatileSocket { path, listener })
+    }
+}
+
+impl Drop for VolatileSocket {
+    fn drop(&mut self) {
+        // There's no way to return a useful error here
+        std::fs::remove_file(&self.path)
+            .expect("Failed to remove tjaeled.sock, please remove it manually");
+    }
+}
+
+impl std::ops::Deref for VolatileSocket {
+    type Target = UnixListener;
+
+    fn deref(&self) -> &Self::Target {
+        &self.listener
+    }
+}
+
+impl std::ops::DerefMut for VolatileSocket {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.listener
     }
 }

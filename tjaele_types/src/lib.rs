@@ -6,6 +6,8 @@ use chrono::{DateTime, Local};
 use derive_more::derive::Display;
 use serde::{Deserialize, Serialize};
 
+pub const SOCKET: &str = "/var/run/tjaele/tjaeled.sock";
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GpuState {
     pub runtime: RuntimeGpuParams,
@@ -103,7 +105,7 @@ pub struct GpuMemStats {
     pub used: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Display)]
 pub enum GpuArchitecture {
     Kepler,
     Maxwell,

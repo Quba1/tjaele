@@ -73,6 +73,7 @@ impl Drop for GpuManager {
                     // Ignoring error here could be potentially dangerous for the GPU
                     .expect("Failed to set auto fan control policy upon nvmlcontrol shutdown");
         }
+        info!("All fans policy set to automatic");
     }
 }
 
