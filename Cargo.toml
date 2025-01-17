@@ -1,5 +1,5 @@
 [workspace]
-members = ["tjaele", "tjaeled", "tjaele-types"]
+members = ["tjaele", "tjaeled", "tjaele_types"]
 resolver = "2"
 
 [workspace.dependencies]
@@ -22,12 +22,9 @@ tokio = { version = "1.43.0", default-features = false, features = [
     "rt-multi-thread",
     "time",
     "sync",
+    "net",
 ] }
-actix-web = { version = "4.9.0", default-features = false, features = [
-    "compat",
-    "macros",
-] }
-reqwest = { version = "0.12.12", default-features = false, features = ["json"] }
+tokio-util = { version = "0.7.13", default-features = false }
 ouroboros = { version = "0.18.5", default-features = false, features = ["std"] }
 serde = { version = "1.0.217", default-features = false, features = ["derive"] }
 toml = { version = "0.8.19", default-features = false, features = ["parse"] }

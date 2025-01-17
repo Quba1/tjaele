@@ -5,23 +5,17 @@ mod fan_curve;
 mod intermediate_bindings;
 
 use anyhow::{ensure, Result};
-use chrono::{DateTime, Local};
-use derive_more::derive::Display;
-use intermediate_bindings::{AdditionalNvmlFunctionality, MinMaxFanSpeeds};
-use nvml_wrapper::{
-    enums::device::DeviceArchitecture, struct_wrappers::device::MemoryInfo,
-    structs::device::CudaComputeCapability, Device, Nvml,
-};
+use intermediate_bindings::AdditionalNvmlFunctionality;
+use nvml_wrapper::{Device, Nvml};
 use ouroboros::self_referencing;
 use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_with::serde_as;
+use tjaele_types::{GpuState, PersistentGpuParams};
 use tracing::info;
 
 #[derive(Debug)]
 pub struct GpuManager {
-    // This is mutexed because I don't know if simulataneous calls to NVML is sound
-    // Using Tokio mutex is somewhat justified as it's an IO function
     nvml_handle: NvmlHandle,
     persistent_params: PersistentGpuParams,
     pub control_config: TjaeleControlConfig,
@@ -51,17 +45,14 @@ impl GpuManager {
             NvmlHandleTryBuilder { nvml, device_builder: |nvml: &Nvml| nvml.device_by_index(0) }
                 .try_build()?;
 
-        let persistent_params = PersistentGpuParams::init(&nvml_handle)?;
+        let persistent_params = nvml_handle.read_persistent_params()?;
 
         Ok(GpuManager { nvml_handle, persistent_params, control_config })
     }
 
-    pub async fn read_state(&self) -> Result<GpuState> {
+    pub fn read_state(&self) -> Result<GpuState> {
         Ok(GpuState {
-            runtime: RuntimeGpuParams::read_from_device(
-                self.nvml_handle.borrow_device(),
-                self.persistent_params.num_fans,
-            )?,
+            runtime: self.nvml_handle.read_runtime_params(self.persistent_params.num_fans)?,
             persistent: self.persistent_params.clone(),
             fan_curve: self.control_config.fan_curve.iter().map(|(t, d)| (*t, *d)).collect(),
         })
@@ -127,4 +118,3 @@ impl TjaeleControlConfig {
         Ok(cfg)
     }
 }
-

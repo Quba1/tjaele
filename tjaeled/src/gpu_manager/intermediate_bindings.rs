@@ -5,9 +5,7 @@ use nvml_wrapper::{
     Device,
 };
 use nvml_wrapper_sys::bindings::nvmlFanControlPolicy_t;
-use serde::{Deserialize, Serialize};
-
-
+use tjaele_types::MinMaxFanSpeeds;
 
 pub trait AdditionalNvmlFunctionality {
     fn min_max_fan_speed(&self) -> Result<MinMaxFanSpeeds, NvmlError>;

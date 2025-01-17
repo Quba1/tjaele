@@ -1,31 +1,30 @@
 use super::{
     intermediate_bindings::AdditionalNvmlFunctionality, ouroboros_impl_nvml_handle::NvmlHandle,
-    ClockSpeeds, CudaVersion, FanState, GpuTemperatureThresholds, PCIeLink, PersistentGpuParams,
-    RuntimeGpuParams, SysInfo,
 };
 use anyhow::{Context, Result};
 use chrono::Local;
 use nvml_wrapper::{
     cuda_driver_version_major, cuda_driver_version_minor,
     enum_wrappers::device::{Clock, TemperatureSensor, TemperatureThreshold},
-    Device, Nvml,
+};
+use tjaele_types::{
+    ClockSpeeds, CudaVersion, FanState, GpuTemperatureThresholds, PCIeLink, PersistentGpuParams,
+    RuntimeGpuParams, SysInfo,
 };
 
-impl PersistentGpuParams {
-    pub(super) fn init(nvml_handle: &NvmlHandle) -> Result<Self> {
-        let nvml = nvml_handle.borrow_nvml();
-        let device = nvml_handle.borrow_device();
+impl NvmlHandle {
+    pub(super) fn read_persistent_params(&self) -> Result<PersistentGpuParams> {
+        let device = self.borrow_device();
 
         Ok(PersistentGpuParams {
-            sys_info: SysInfo::read_from_driver(nvml, device)?,
+            sys_info: self.read_sys_info()?,
 
             device_name: device.name().context("Failed to read GPU name")?,
-            architecture: device.architecture().context("Failed to read GPU arch")?,
+            architecture: device.architecture().context("Failed to read GPU arch")?.into(),
             num_cores: device.num_cores().context("Failed to read GPU num cores")?,
             num_fans: device.num_fans().context("Failed to read GPU num fans")? as usize,
 
-            max_pcie_link: PCIeLink::max_from_device(device)
-                .context("Failed to read GPU max PCIe link")?,
+            max_pcie_link: self.read_max_pcie_link().context("Failed to read GPU max PCIe link")?,
 
             temp_thresholds: GpuTemperatureThresholds {
                 shutdown: device
@@ -44,44 +43,43 @@ impl PersistentGpuParams {
                 .context("Failed to read GPU min/max fan speeds")?,
         })
     }
-}
 
-impl RuntimeGpuParams {
-    pub(super) fn read_from_device(device: &Device, num_fans: usize) -> Result<Self> {
+    pub(super) fn read_runtime_params(&self, num_fans: usize) -> Result<RuntimeGpuParams> {
+        let device = self.borrow_device();
+
         Ok(RuntimeGpuParams {
             probe_time: Local::now(),
-            current_pcie_link: PCIeLink::current_from_device(device)
+            current_pcie_link: self
+                .read_current_pcie_link()
                 .context("Failed to read GPU PCIe link info")?,
-            memory_info: device.memory_info().context("Failed to read GPU memory info")?,
+            memory_info: device.memory_info().context("Failed to read GPU memory info")?.into(),
             power_usage: f64::from(device.power_usage().context("Failed to read GPU power usage")?)
                 / 1000.0,
-            clock_speeds: ClockSpeeds::read_from_device(device)
-                .context("Failed to read GPU clock speeds")?,
-            // there's only one temperature sensor variant
+            clock_speeds: self.read_clock_speeds().context("Failed to read GPU clock speeds")?,
             device_temperature: device
                 .temperature(TemperatureSensor::Gpu)
                 .context("Failed to read GPU temperature")?,
             fan_states: (0..num_fans)
-                .map(|index| -> Result<FanState> { FanState::read_from_device(index, device) })
+                .map(|index| -> Result<FanState> { self.read_fan_state(index) })
                 .collect::<Result<Vec<_>>>()
                 .context("Failed to read GPU fan states")?,
         })
     }
-}
 
-impl SysInfo {
-    pub fn read_from_driver(nvml: &Nvml, device: &Device) -> Result<Self> {
+    fn read_sys_info(&self) -> Result<SysInfo> {
+        let nvml = self.borrow_nvml();
+        let device = self.borrow_device();
+
         Ok(SysInfo {
             driver_version: nvml.sys_driver_version()?,
-            cuda_version: CudaVersion::read_from_driver(nvml)?,
-            cuda_capability: device.cuda_compute_capability()?,
+            cuda_version: self.read_cuda_version()?,
+            cuda_capability: device.cuda_compute_capability()?.into(),
             nvml_version: nvml.sys_nvml_version()?,
         })
     }
-}
 
-impl CudaVersion {
-    pub fn read_from_driver(nvml: &Nvml) -> Result<Self> {
+    fn read_cuda_version(&self) -> Result<CudaVersion> {
+        let nvml = self.borrow_nvml();
         let cuda_version = nvml.sys_cuda_driver_version()?;
 
         Ok(CudaVersion {
@@ -89,10 +87,10 @@ impl CudaVersion {
             minor: cuda_driver_version_minor(cuda_version),
         })
     }
-}
 
-impl PCIeLink {
-    pub(self) fn max_from_device(device: &Device) -> Result<Self> {
+    pub(self) fn read_max_pcie_link(&self) -> Result<PCIeLink> {
+        let device = self.borrow_device();
+
         Ok(PCIeLink {
             gen: device.max_pcie_link_gen()?,
             width: device.max_pcie_link_width()?,
@@ -105,17 +103,19 @@ impl PCIeLink {
         })
     }
 
-    pub(self) fn current_from_device(device: &Device) -> Result<Self> {
+    fn read_current_pcie_link(&self) -> Result<PCIeLink> {
+        let device = self.borrow_device();
+
         Ok(PCIeLink {
             gen: device.current_pcie_link_gen()?,
             width: device.current_pcie_link_width()?,
             speed: device.pcie_link_speed().map(u64::from).map(|x| x * 1_000_000)?,
         })
     }
-}
 
-impl ClockSpeeds {
-    pub(self) fn read_from_device(device: &Device) -> Result<Self> {
+    fn read_clock_speeds(&self) -> Result<ClockSpeeds> {
+        let device = self.borrow_device();
+
         Ok(ClockSpeeds {
             memory: device.clock_info(Clock::Memory)?,
             graphics: device.clock_info(Clock::Graphics)?,
@@ -123,10 +123,10 @@ impl ClockSpeeds {
             streaming_multiprocessor: device.clock_info(Clock::SM)?,
         })
     }
-}
 
-impl FanState {
-    pub(self) fn read_from_device(index: usize, device: &Device) -> Result<Self> {
+    fn read_fan_state(&self, index: usize) -> Result<FanState> {
+        let device = self.borrow_device();
+
         Ok(FanState {
             index,
             speed: device

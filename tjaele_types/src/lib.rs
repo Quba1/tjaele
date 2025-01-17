@@ -1,5 +1,5 @@
 mod impls;
-#[cfg(feature="nvml_types")]
+#[cfg(feature = "nvml_types")]
 mod nvml_integration;
 
 use chrono::{DateTime, Local};
@@ -19,6 +19,7 @@ pub struct RuntimeGpuParams {
     pub current_pcie_link: PCIeLink,
     pub memory_info: GpuMemStats,
     pub power_usage: f64,
+    // there's only one temperature sensor variant
     pub device_temperature: u32,
     pub fan_states: Vec<FanState>,
     pub clock_speeds: ClockSpeeds,
