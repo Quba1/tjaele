@@ -7,7 +7,7 @@ Wants=sockets.target
 [Service]
 Type=simple
 RuntimeDirectory=tjaele
-ExecStart=/usr/local/bin/tjaeled -c /usr/local/etc/tjaele/config.toml
+ExecStart=/usr/local/sbin/tjaeled -c /usr/local/etc/tjaele/config.toml
 RestartSec=5
 Restart=always
 

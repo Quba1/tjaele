@@ -8,14 +8,16 @@ if [ "$EUID" -ne 0 ]
 fi
 
 mkdir -p /usr/local/etc/tjaele
-cp ./example_config.toml /usr/local/etc/tjaele/config.toml
+cp ./utils/example_config.toml /usr/local/etc/tjaele/config.toml
 
-mkdir -p /usr/local/bin
+cp ./target/release/tjaeled /usr/local/sbin/tjaeled
+chmod +x /usr/local/sbin/tjaeled
+
 cp ./target/release/tjaele /usr/local/bin/tjaele
 chmod +x /usr/local/bin/tjaele
 
 mkdir -p /usr/local/lib/systemd/system
-cp ./tjaele.service /usr/local/lib/systemd/system/tjaele.service
+cp ./utils/tjaele.service /usr/local/lib/systemd/system/tjaele.service
 
 systemctl daemon-reload
 systemctl enable tjaele
