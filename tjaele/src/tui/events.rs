@@ -26,8 +26,8 @@ pub struct EventHandler {
 
 impl EventHandler {
     /// Constructs a new instance of [`EventHandler`].
-    pub fn new(tick_rate: u64) -> Self {
-        let tick_rate = Duration::from_millis(tick_rate);
+    pub fn new(tick_rate: f64) -> Self {
+        let tick_rate = Duration::from_secs_f64(tick_rate);
 
         let (sender, receiver) = mpsc::unbounded_channel();
 

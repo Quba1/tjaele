@@ -1,51 +1,55 @@
 use std::time::{Duration, Instant};
 
-mod events;
-mod tui_blocks;
 
 use anyhow::{Context, Result};
-use futures::{FutureExt, StreamExt};
+use crossterm::event::KeyCode;
 use http_body_util::{BodyExt, Empty};
 use hyper::{
     body::{Buf, Bytes},
     Request,
 };
 use hyper_util::rt::TokioIo;
-use ratatui::crossterm::{
-    self,
-    event::{Event as CrosstermEvent, KeyEvent},
-};
+use ratatui::crossterm::{self, event::KeyEvent};
 use tjaele_types::{GpuState, SOCKET};
-use tokio::{net::UnixStream, sync::mpsc};
+use tokio::net::UnixStream;
 
 #[derive(Debug)]
 pub struct App {
-    socket_client: UdsClient,
-    latest_data: Result<MonitorData>,
-    is_running: bool,
+    pub latest_data: Result<MonitorData>,
+    pub running: bool,
 }
 
 #[derive(Debug)]
 pub struct MonitorData {
-    gpu_state: GpuState,
-    latency: Duration,
+    pub gpu_state: GpuState,
+    pub latency: Duration,
 }
 
 impl App {
     pub async fn init() -> Result<Self> {
-        let socket_client = UdsClient;
-        let latest_data = MonitorData::probe(&socket_client).await;
+        let latest_data = MonitorData::probe().await;
 
-        Ok(App { is_running: true, latest_data, socket_client })
+        Ok(App { running: true, latest_data })
+    }
+
+    pub async fn tick(&mut self) {
+        self.latest_data = MonitorData::probe().await;
+    }
+
+    pub async fn handle_key_events(&mut self, key_event: KeyEvent) {
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Char('q') => {
+                self.running = false;
+            },
+            _ => {},
+        }
     }
 }
-
 impl MonitorData {
-    pub async fn probe(client: &UdsClient) -> Result<Self> {
+    pub async fn probe() -> Result<Self> {
         let now = Instant::now();
 
-        let gpu_device_state = client
-            .fetch_gpu_data()
+        let gpu_device_state = UdsClient::fetch_gpu_data()
             .await
             .context("Failed to get tjaele data, is control unit running?")?;
 
@@ -56,11 +60,11 @@ impl MonitorData {
 }
 
 #[derive(Debug)]
-struct UdsClient;
+pub struct UdsClient;
 
 impl UdsClient {
     /// From Hyper client example
-    async fn fetch_gpu_data(&self) -> Result<GpuState> {
+    async fn fetch_gpu_data() -> Result<GpuState> {
         let stream = UnixStream::connect(SOCKET).await?;
         let io = TokioIo::new(stream);
 

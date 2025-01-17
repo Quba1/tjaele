@@ -1,17 +1,15 @@
 //! Heavily inspied by `simple-async` form https://github.com/ratatui/templates
 
 mod app;
+mod tui;
 
 use anyhow::{ensure, Result};
 use app::App;
 use clap::{command, Parser};
+use tui::{Event, Tui};
 
 #[derive(Parser)]
-#[command(
-    version,
-    about = "Nvidia Fan Control for Wayland",
-    long_about = "long about",
-)]
+#[command(version, about = "Nvidia Fan Control for Wayland", long_about = "long about")]
 struct Cli {
     /// Monitor refresh interval in seconds
     #[arg(short, long, default_value_t = 2.0)]
@@ -27,9 +25,20 @@ async fn main() -> Result<()> {
         "Monitor refresh interval must be between 0.1 and 10 secods"
     );
 
-    let app = App::init().await?;
+    let mut app = App::init().await?;
+    let terminal = ratatui::try_init()?;
+    let mut tui = Tui::new(terminal, cli.refresh_interval);
 
-    dbg!(app);
+    while app.running {
+        tui.draw(&app)?;
+
+        match tui.events.next().await? {
+            Event::Tick => app.tick().await,
+            Event::Key(key_event) => app.handle_key_events(key_event).await,
+        }
+    }
+
+    ratatui::try_restore()?;
 
     Ok(())
 }
