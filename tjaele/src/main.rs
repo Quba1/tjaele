@@ -35,6 +35,7 @@ async fn main() -> Result<()> {
         match tui.events.next().await? {
             Event::Tick => app.tick().await,
             Event::Key(key_event) => app.handle_key_events(key_event).await,
+            Event::DrawTrigger => {},
         }
     }
 

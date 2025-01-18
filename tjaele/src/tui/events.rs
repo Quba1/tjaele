@@ -15,6 +15,8 @@ pub enum Event {
     Tick,
     /// Key press.
     Key(KeyEvent),
+    /// Terminal event that should cause redraw
+    DrawTrigger,
 }
 
 /// Terminal event handler.
@@ -47,10 +49,19 @@ impl EventHandler {
                     sender.send(Event::Tick).unwrap();
                   }
                   Some(Ok(evt)) = crossterm_event => {
-                    if let CrosstermEvent::Key(key) = evt {
-                      if key.kind == crossterm::event::KeyEventKind::Press {
-                        sender.send(Event::Key(key)).unwrap();
-                      }
+                    match evt {
+                      CrosstermEvent::Key(key) => {
+                        if key.kind == crossterm::event::KeyEventKind::Press {
+                          sender.send(Event::Key(key)).unwrap();
+                        }
+                      },
+                      CrosstermEvent::Resize(_, _) => {
+                        sender.send(Event::DrawTrigger).unwrap();
+                      },
+                      CrosstermEvent::FocusGained => {
+                        sender.send(Event::DrawTrigger).unwrap();
+                      },
+                      _ => {},
                     }
                   }
                 };
