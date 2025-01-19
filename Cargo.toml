@@ -10,6 +10,7 @@ version = "0.1.0"
 publish = false
 edition = "2021"
 repository = "https://github.com/Quba1/tjaele"
+description = "Fan control for Nvidia GPUs on Linux with Wayland"
 
 [workspace.dependencies]
 anyhow = { version = "1.0.95", default-features = false, features = ["std"] }
