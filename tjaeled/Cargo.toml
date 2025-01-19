@@ -1,8 +1,12 @@
 [package]
 name = "tjaeled"
-version = "0.1.0"
-edition = "2021"
-publish = false
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+readme.workspace = true
+repository.workspace = true
 
 [dependencies]
 clap = { workspace = true }
