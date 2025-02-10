@@ -17,10 +17,10 @@ cp ./target/release/tjaele /usr/local/bin/tjaele
 chmod +x /usr/local/bin/tjaele
 
 mkdir -p /usr/local/lib/systemd/system
-cp ./utils/tjaele.service /usr/local/lib/systemd/system/tjaele.service
+cp ./utils/tjaeled.service /usr/local/lib/systemd/system/tjaeled.service
 
 systemctl daemon-reload
-systemctl enable tjaele
-systemctl start tjaele
+systemctl enable tjaeled
+systemctl start tjaeled
 
 echo "Now edit config.toml file in /usr/local/etc/tjaele"
